@@ -18,7 +18,7 @@ def load_data(file_path):
 
 # Sample data loading
 # Replace 'data.xlsx' with your actual Excel file path or use an upload component
-data = load_data('20240924 Physio log.xlsx')
+data = load_data('20240924 Surgery rehab.xlsx')
 available_dates = data['Date'].unique()
 
 # App layout
@@ -43,6 +43,7 @@ app.layout = dbc.Container(
 # Callback to update the graph and current date
 @app.callback(
     [
+        Output('store-date', 'data'),
         Output('current-date', 'children'),
         Output('daily-graph', 'figure'),
         Output('overall-graph', 'figure'),
@@ -86,7 +87,7 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
     fig_overall = make_subplots(
         rows=1, cols=1,
         shared_xaxes=False,
-        vertical_spacing=0.1,  # Adjust the space between plots
+        vertical_spacing=0.5,  # Adjust the space between plots
     )
 
     # Plot Angle data (top graph)
@@ -119,12 +120,19 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
 
     # Add vertical lines for events, and tooltips for event details
     for _, row in daily_data.iterrows():
-        if row['Events'] == 'Rest':
+        # Determine the color and line style based on the event type
+        if row['Events'] == 'L':
             color = 'green'
-        elif row['Events'] == 'Move':
-            color = 'orange'
-        elif row['Events'] == 'Exercise':
+            line_width = 1  # Green line with default width
+            dash_style = None  # Green lines dashed
+        elif row['Events'] == 'M':
+            color = 'yellow'
+            line_width = 1  # Yellow line thin
+            dash_style = None  # Yellow line not dashed (solid)
+        elif row['Events'] == 'H':
             color = 'red'
+            line_width = 1  # Red line thicker
+            dash_style = None  # Red lines dashed
         else:
             continue
 
@@ -137,7 +145,10 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
             y1=1,
             xref='x',
             yref='paper',
-            line=dict(color=color, width=2, dash='dash')
+            line=dict(
+                color=color,
+                width=line_width,
+                dash=dash_style)
         )
 
         # Add invisible scatter points for hover text (tooltips)
@@ -176,41 +187,38 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
         title=f'Data for {current_date}',
         xaxis1=dict(
             range=[day_start, day_end],  # Set x-axis from midnight to midnight for top two plots
-            title='Time'
         ),
         xaxis2 = dict(
             range=[day_start, day_end],  # Set x-axis from midnight to midnight for top two plots
-            title='Time'
         ),
         yaxis=dict(
             title='Angle (degrees)',
-            range=[0, 100]  # Fixed range for Angle axis (top graph)
-        ),
+            range=[10, 90],  # Fixed range for Angle axis (top graph)
+            nticks = 9
+    ),
         yaxis2=dict(
             title='Swelling (dimensionless)',
             range=[0, 20],  # Fixed range for Swelling axis (middle graph)
         ),
-        height=800,  # Adjust height for three plots
+        height=500,  # Adjust height for three plots
         legend=dict(x=0.01, y=0.99),
         margin=dict(l=0, r=0, t=40, b=20)
     )
 
-    fig_daily.update_layout(
-        title=f'Data for {current_date}',
-        xaxis=dict(  # Show the full range of time
-            title='Time',
-        ),
+    fig_overall.update_layout(
+        title=f'Overall',
         yaxis=dict(  # Third graph's y-axis range for all angle data
-            title='All Angle Data',
-            range=[0, 100]
+            title='Angle (degrees)',
+            range=[10, 90],
+            nticks=9
         ),
-        height=800,  # Adjust height for three plots
+        height=230,  # Adjust height for three plots
         legend=dict(x=0.01, y=0.99),
         margin=dict(l=0, r=0, t=40, b=20)
     )
 
     # Update the current date displayed in the header
-    return str(current_date), fig_daily, fig_overall
+    return current_date_index, str(current_date), fig_daily, fig_overall
 
 # Run the app
 if __name__ == '__main__':
