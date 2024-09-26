@@ -35,6 +35,7 @@ app.layout = dbc.Container(
             className='justify-content-center mb-4'
         ),
         dcc.Graph(id='daily-graph'),
+        dcc.Graph(id='overall-graph'),
     ],
     fluid=True,
 )
@@ -44,6 +45,7 @@ app.layout = dbc.Container(
     [
         Output('current-date', 'children'),
         Output('daily-graph', 'figure'),
+        Output('overall-graph', 'figure'),
     ],
     [
         Input('prev-day', 'n_clicks'),
@@ -69,16 +71,26 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
     current_date = available_dates[current_date_index]
     daily_data = df[df['Date'] == current_date]
 
-    # Create a figure with two subplots, vertically stacked
-    fig = make_subplots(
+    # Calculate the time range for the day (midnight to midnight)
+    day_start = pd.to_datetime(current_date + ' 00:00:00')
+    day_end = pd.to_datetime(current_date + ' 23:59:59')
+
+    # Create a figure with three subplots, vertically stacked
+    fig_daily = make_subplots(
         rows=2, cols=1,
         shared_xaxes=True,
         vertical_spacing=0.1,  # Adjust the space between plots
         subplot_titles=('Angle (degrees)', 'Swelling (dimensionless)')
     )
 
+    fig_overall = make_subplots(
+        rows=1, cols=1,
+        shared_xaxes=False,
+        vertical_spacing=0.1,  # Adjust the space between plots
+    )
+
     # Plot Angle data (top graph)
-    fig.add_trace(go.Scatter(
+    fig_daily.add_trace(go.Scatter(
         x=daily_data['Datetime'],
         y=daily_data['Angle [deg]'],
         mode='markers',
@@ -92,7 +104,7 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
     ), row=1, col=1)
 
     # Plot Swelling data (bottom graph)
-    fig.add_trace(go.Scatter(
+    fig_daily.add_trace(go.Scatter(
         x=daily_data['Datetime'],
         y=daily_data['Swelling'],
         mode='markers',
@@ -110,14 +122,14 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
         if row['Events'] == 'Rest':
             color = 'green'
         elif row['Events'] == 'Move':
-            color = 'blue'
+            color = 'orange'
         elif row['Events'] == 'Exercise':
             color = 'red'
         else:
             continue
 
         # Add vertical lines to both subplots
-        fig.add_shape(
+        fig_daily.add_shape(
             type='line',
             x0=row['Datetime'],
             x1=row['Datetime'],
@@ -129,7 +141,7 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
         )
 
         # Add invisible scatter points for hover text (tooltips)
-        fig.add_trace(go.Scatter(
+        fig_daily.add_trace(go.Scatter(
             x=[row['Datetime']],
             y=[1],  # Place the tooltip at the top of the graph
             mode='markers',
@@ -139,7 +151,7 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
             showlegend=False  # Hide from legend
         ), row=1, col=1)  # Tooltip added to the top graph
 
-        fig.add_trace(go.Scatter(
+        fig_daily.add_trace(go.Scatter(
             x=[row['Datetime']],
             y=[1],  # Place the tooltip at the top of the bottom graph
             mode='markers',
@@ -149,25 +161,56 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
             showlegend=False  # Hide from legend
         ), row=2, col=1)  # Tooltip added to the bottom graph
 
-    # Customize layout to include fixed axis ranges for both plots
-    fig.update_layout(
+        # Plot all Angle data on the third graph (constant, for all data points)
+    fig_overall.add_trace(go.Scatter(
+        x=df['Datetime'],
+        y=df['Angle [deg]'],
+        mode='markers',
+        name='All Angle Data',
+        line=dict(color='blue'),
+        marker=dict(symbol='circle', size=6, color='blue', line=dict(color='darkblue', width=1))
+    ), row=1, col=1)
+
+    # Customize layout to include fixed axis ranges, no event lines on the third graph, and shared time range
+    fig_daily.update_layout(
         title=f'Data for {current_date}',
-        xaxis_title='Time',
+        xaxis1=dict(
+            range=[day_start, day_end],  # Set x-axis from midnight to midnight for top two plots
+            title='Time'
+        ),
+        xaxis2 = dict(
+            range=[day_start, day_end],  # Set x-axis from midnight to midnight for top two plots
+            title='Time'
+        ),
         yaxis=dict(
             title='Angle (degrees)',
             range=[0, 100]  # Fixed range for Angle axis (top graph)
         ),
         yaxis2=dict(
             title='Swelling (dimensionless)',
-            range=[5, 20],  # Fixed range for Swelling axis (bottom graph)
+            range=[0, 20],  # Fixed range for Swelling axis (middle graph)
         ),
-        height=700,  # Adjust height for two plots
+        height=800,  # Adjust height for three plots
+        legend=dict(x=0.01, y=0.99),
+        margin=dict(l=0, r=0, t=40, b=20)
+    )
+
+    fig_daily.update_layout(
+        title=f'Data for {current_date}',
+        xaxis=dict(  # Show the full range of time
+            title='Time',
+        ),
+        yaxis=dict(  # Third graph's y-axis range for all angle data
+            title='All Angle Data',
+            range=[0, 100]
+        ),
+        height=800,  # Adjust height for three plots
         legend=dict(x=0.01, y=0.99),
         margin=dict(l=0, r=0, t=40, b=20)
     )
 
     # Update the current date displayed in the header
-    return str(current_date), fig
+    return str(current_date), fig_daily, fig_overall
 
 # Run the app
 if __name__ == '__main__':
