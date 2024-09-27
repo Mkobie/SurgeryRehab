@@ -1,24 +1,45 @@
 import dash
-from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
+import gdown
 import pandas as pd
 import plotly.graph_objects as go
+from dash import dcc, html, State
+from dash.dependencies import Input, Output
 from plotly.subplots import make_subplots
-import openpyxl
+
+# todo:
+#   https://render.com/pricing
+#   https://github.com/thusharabandara/dash-app-render-deployment
+#   https://www.pythonanywhere.com/pricing/
+
 
 # Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-# Function to load and process the Excel data
-def load_data(file_path):
-    df = pd.read_excel(file_path, engine='openpyxl', sheet_name='python')
+# Function to download the Excel file from Google Drive
+def download_excel_from_gdrive(gdrive_url):
+    # Convert the Google Drive shareable link to a direct download link
+    file_id = gdrive_url.split('/d/')[1].split('/')[0]
+    download_url = f'https://drive.google.com/uc?id={file_id}&export=download'
+
+    # Download the file to a local path
+    output_file = 'data_from_gdrive.xlsx'  # Local file name
+    gdown.download(download_url, output_file, quiet=False)
+
+    # Load the Excel file into a pandas DataFrame
+    df = pd.read_excel(output_file)
     df['Datetime'] = pd.to_datetime(df['Datetime'], format='%d/%m/%Y %H:%M')
     df['Date'] = df['Datetime'].dt.date
+    df['Swelling'] = df['Circ low [cm]'].mul(df['Circ med [cm]']).mul(df['Circ high [cm]']).subtract(50000).div(1000)
     return df
+
+def get_swelling(low, med, high):
+    return (low*med*high - 50000) / 1000
 
 # Sample data loading
 # Replace 'data.xlsx' with your actual Excel file path or use an upload component
-data = load_data('20240924 Surgery rehab.xlsx')
+gdrive_url = 'https://docs.google.com/spreadsheets/d/1bUDv4iCsTPddnd0yYFgj6xg_mzgpvdta/edit?usp=sharing&ouid=111732102481483761509&rtpof=true&sd=true'
+data = download_excel_from_gdrive(gdrive_url)
 available_dates = data['Date'].unique()
 
 # App layout
@@ -87,7 +108,7 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
     fig_overall = make_subplots(
         rows=1, cols=1,
         shared_xaxes=False,
-        vertical_spacing=0.5,  # Adjust the space between plots
+        vertical_spacing=0.1,  # Adjust the space between plots
     )
 
     # Plot Angle data (top graph)
@@ -200,7 +221,7 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
             title='Swelling (dimensionless)',
             range=[0, 20],  # Fixed range for Swelling axis (middle graph)
         ),
-        height=500,  # Adjust height for three plots
+        height=400,  # Adjust height for three plots
         legend=dict(x=0.01, y=0.99),
         margin=dict(l=0, r=0, t=40, b=20)
     )
