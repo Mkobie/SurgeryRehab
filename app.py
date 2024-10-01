@@ -11,6 +11,7 @@ from plotly.subplots import make_subplots
 
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server
 
 def download_excel_from_gdrive(gdrive_url):
     file_id = gdrive_url.split('/d/')[1].split('/')[0]
