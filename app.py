@@ -7,46 +7,58 @@ from dash import dcc, html, State
 from dash.dependencies import Input, Output
 from plotly.subplots import make_subplots
 
+# https://docs.google.com/spreadsheets/d/1aosvnSmsJQOGKC1ovB38PTfes1ZzHu73/edit?usp=sharing&ouid=111732102481483761509&rtpof=true&sd=true
+
 # todo:
 #   https://render.com/pricing
 #   https://github.com/thusharabandara/dash-app-render-deployment
 #   https://www.pythonanywhere.com/pricing/
 
 
-# Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-# Function to download the Excel file from Google Drive
 def download_excel_from_gdrive(gdrive_url):
-    # Convert the Google Drive shareable link to a direct download link
     file_id = gdrive_url.split('/d/')[1].split('/')[0]
     download_url = f'https://drive.google.com/uc?id={file_id}&export=download'
 
-    # Download the file to a local path
-    output_file = 'data_from_gdrive.xlsx'  # Local file name
+    output_file = 'data_from_gdrive.xlsx'
     gdown.download(download_url, output_file, quiet=False)
 
-    # Load the Excel file into a pandas DataFrame
     df = pd.read_excel(output_file)
     df['Datetime'] = pd.to_datetime(df['Datetime'], format='%d/%m/%Y %H:%M')
     df['Date'] = df['Datetime'].dt.date
-    df['Swelling'] = df['Circ low [cm]'].mul(df['Circ med [cm]']).mul(df['Circ high [cm]']).subtract(50000).div(1000)
     return df
 
-def get_swelling(low, med, high):
-    return (low*med*high - 50000) / 1000
-
-# Sample data loading
-# Replace 'data.xlsx' with your actual Excel file path or use an upload component
-gdrive_url = 'https://docs.google.com/spreadsheets/d/1bUDv4iCsTPddnd0yYFgj6xg_mzgpvdta/edit?usp=sharing&ouid=111732102481483761509&rtpof=true&sd=true'
-data = download_excel_from_gdrive(gdrive_url)
+default_gdrive_url = 'https://docs.google.com/spreadsheets/d/1bUDv4iCsTPddnd0yYFgj6xg_mzgpvdta/edit?usp=sharing&ouid=111732102481483761509&rtpof=true&sd=true'
+data = download_excel_from_gdrive(default_gdrive_url)  # todo: remove code duplication
 available_dates = data['Date'].unique()
 
 # App layout
 app.layout = dbc.Container(
     [
-        dcc.Store(id='store-date', data=0),  # This store will keep track of the current date index
+        dcc.Store(id='store-date', data=len(available_dates) - 1),  # This store will keep track of the current date index
+        dcc.Store(id='store-dates', data=available_dates),  # This store will keep track of the unique dates
         dcc.Store(id='store-data', data=data.to_dict()),  # Store the entire dataset in memory
+
+        html.Div(
+            html.P([
+                "Data comes from " ,
+                html.A("this Google doc", href=default_gdrive_url, target="_blank"),
+                ". To use this tool yourself, make your own Google Sheet using the same format. "
+                "Upload your file on the right."
+            ]),
+            style={'position': 'absolute', 'top': '0px', 'left': '15px', 'width': '35%'},
+        ),
+
+        html.Div(
+            dbc.InputGroup(
+                [
+                    dbc.Input(id="google-sheet-url", placeholder="Enter Google Sheet URL (allow view access)"),
+                    dbc.Button("Upload data", id="upload-button", n_clicks=0),
+                ]
+            ), style={'position': 'absolute', 'top': '0px', 'right': '15px', 'width': '35%'},
+        ),
+
         dbc.Row(
             [
                 dbc.Col(dbc.Button('<', id='prev-day', color='primary', className='mr-2'), width='auto'),
@@ -57,9 +69,37 @@ app.layout = dbc.Container(
         ),
         dcc.Graph(id='daily-graph'),
         dcc.Graph(id='overall-graph'),
+        html.Div(id='dummy', style={'display': 'none'})
     ],
     fluid=True,
 )
+
+@app.callback(
+    [
+        Output('store-data', 'data'),
+        Output('store-dates', 'data')
+    ],
+    [
+        # Input('dummy', 'children'),
+        Input('upload-button', 'n_clicks')
+    ],
+    [
+    State('google-sheet-url', 'value')
+    ]
+)
+def load_data(n_clicks, user_provided_url):
+    gdrive_url = 'https://docs.google.com/spreadsheets/d/1bUDv4iCsTPddnd0yYFgj6xg_mzgpvdta/edit?usp=sharing&ouid=111732102481483761509&rtpof=true&sd=true'
+    default_gdrive_url = gdrive_url
+    gdrive_url = user_provided_url if user_provided_url else default_gdrive_url
+
+    data = download_excel_from_gdrive(gdrive_url)
+    available_dates = data['Date'].unique()
+
+    if data is not None:
+        return data.to_dict(), available_dates
+
+    return dash.no_update
+
 
 # Callback to update the graph and current date
 @app.callback(
@@ -71,14 +111,14 @@ app.layout = dbc.Container(
     ],
     [
         Input('prev-day', 'n_clicks'),
-        Input('next-day', 'n_clicks')
+        Input('next-day', 'n_clicks'),
+        Input('store-data', 'data')
     ],
     [
-        State('store-date', 'data'),
-        State('store-data', 'data')
+        State('store-date', 'data')
     ]
 )
-def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
+def update_graph(prev_clicks, next_clicks, stored_data, current_date_index):
     df = pd.DataFrame(stored_data)
     available_dates = df['Date'].unique()
 
@@ -125,17 +165,45 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
         )
     ), row=1, col=1)
 
-    # Plot Swelling data (bottom graph)
+    # Plot Circ low [cm] data
     fig_daily.add_trace(go.Scatter(
         x=daily_data['Datetime'],
-        y=daily_data['Swelling'],
+        y=daily_data['Circ low [cm]'],
         mode='markers',
-        name='Swelling (dimensionless)',
+        name='Circ low [cm]',
+        marker=dict(
+            symbol='square',
+            size=8,
+            color='pink',
+            # line=dict(color='darkblue', width=2)
+        )
+    ), row=2, col=1)
+
+    # Plot Circ med [cm] data
+    fig_daily.add_trace(go.Scatter(
+        x=daily_data['Datetime'],
+        y=daily_data['Circ med [cm]'],
+        mode='markers',
+        name='Circ med [cm]',
         marker=dict(
             symbol='diamond',
-            size=10,
+            size=8,
             color='red',
-            line=dict(color='black', width=2)
+            # line=dict(color='darkgreen', width=2)
+        )
+    ), row=2, col=1)
+
+    # Plot Circ high [cm] data
+    fig_daily.add_trace(go.Scatter(
+        x=daily_data['Datetime'],
+        y=daily_data['Circ high [cm]'],
+        mode='markers',
+        name='Circ high [cm]',
+        marker=dict(
+            symbol='triangle-up',
+            size=8,
+            color='darkred',
+            # line=dict(color='darkorange', width=2)
         )
     ), row=2, col=1)
 
@@ -219,7 +287,7 @@ def update_graph(prev_clicks, next_clicks, current_date_index, stored_data):
     ),
         yaxis2=dict(
             title='Swelling (dimensionless)',
-            range=[0, 20],  # Fixed range for Swelling axis (middle graph)
+            range=[35, 45],  # Fixed range for Swelling axis (middle graph)
         ),
         height=400,  # Adjust height for three plots
         legend=dict(x=0.01, y=0.99),
