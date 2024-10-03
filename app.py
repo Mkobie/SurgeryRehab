@@ -40,8 +40,8 @@ app.layout = dbc.Container(
             html.P([
                 "Data comes from " ,
                 html.A("this Google doc", href=default_gdrive_url, target="_blank"),
-                ". To use this tool yourself, make your own Google Sheet using the same format. "
-                "Upload your file on the right."
+                ". To use this tool yourself, make your own Google Sheet using the same format and "
+                "a link to it on the right."
             ]),
             style={'position': 'absolute', 'top': '0px', 'left': '15px', 'width': '35%'},
         ),
@@ -131,7 +131,7 @@ def update_graph(prev_clicks, next_clicks, stored_data, current_date_index):
         rows=2, cols=1,
         shared_xaxes=True,
         vertical_spacing=0.1,
-        subplot_titles=('Angle (degrees)', 'Swelling (dimensionless)')
+        subplot_titles=('Angle (degrees)', 'Swelling (cm)')
     )
 
     fig_overall = make_subplots(
