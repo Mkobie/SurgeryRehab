@@ -7,8 +7,7 @@ from dash import dcc, html, State
 from dash.dependencies import Input, Output
 from plotly.subplots import make_subplots
 
-# https://docs.google.com/spreadsheets/d/1aosvnSmsJQOGKC1ovB38PTfes1ZzHu73/edit?usp=sharing&ouid=111732102481483761509&rtpof=true&sd=true
-
+# https://mpfl-tto-surgery-rehab.onrender.com/
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
@@ -258,8 +257,8 @@ def update_graph(prev_clicks, next_clicks, stored_data, current_date_index):
         ),
         yaxis=dict(
             title='Angle (degrees)',
-            range=[10, 90],
-            nticks = 9
+            range=[0, 150],
+            nticks = 8
     ),
         yaxis2=dict(
             title='Swelling (dimensionless)',
@@ -274,13 +273,15 @@ def update_graph(prev_clicks, next_clicks, stored_data, current_date_index):
         title=f'Overall',
         yaxis=dict(
             title='Angle (degrees)',
-            range=[10, 90],
-            nticks=9
+            range=[0, 150],
+            nticks=8
         ),
         height=230,
         legend=dict(x=0.01, y=0.99),
         margin=dict(l=0, r=0, t=40, b=20)
     )
+
+    fig_overall.add_hline(y=90, line_width=1, line_color="grey")
 
     return current_date_index, str(current_date), fig_daily, fig_overall
 
