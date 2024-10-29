@@ -35,12 +35,23 @@ app.layout = dbc.Container(
         dcc.Store(id='store-data', data=data.to_dict()),
         dcc.Store(id='default-url', data=default_gdrive_url),
 
+        dbc.Row(
+            [
+                dbc.Col(dbc.Button('<<', id='first-day', color='primary', className='mr-2'), width='auto'),
+                dbc.Col(dbc.Button('<', id='prev-day', color='primary', className='mr-2'), width='auto'),
+                dbc.Col(html.H3(id='current-date', className='text-center'), width='auto'),
+                dbc.Col(dbc.Button('>', id='next-day', color='primary', className='ml-2'), width='auto'),
+                dbc.Col(dbc.Button('>>', id='last-day', color='primary', className='ml-2'), width='auto'),
+            ],
+            className='justify-content-center mb-3'
+        ),
+
         html.Div(
             [
                 dbc.InputGroup(
                 [
                     dbc.Input(id="google-sheet-url", placeholder="Enter Google Sheet URL (allow view access)", value=default_gdrive_url),
-                    dbc.Button("Fetch data", id="upload-button", n_clicks=0),
+                    dbc.Button("Graph data", id="upload-button", n_clicks=0),
                     dbc.Button("?", id="upload-help-button", n_clicks=0),
                 ]
             ),
@@ -63,19 +74,7 @@ app.layout = dbc.Container(
                 id="upload-help-modal",
                 is_open=False,
             ),
-
             ], style={'position': 'absolute', 'top': '0px', 'right': '15px', 'width': '25%'},
-        ),
-
-        dbc.Row(
-            [
-                dbc.Col(dbc.Button('<<', id='first-day', color='primary', className='mr-2'), width='auto'),
-                dbc.Col(dbc.Button('<', id='prev-day', color='primary', className='mr-2'), width='auto'),
-                dbc.Col(html.H3(id='current-date', className='text-center'), width='auto'),
-                dbc.Col(dbc.Button('>', id='next-day', color='primary', className='ml-2'), width='auto'),
-                dbc.Col(dbc.Button('>>', id='last-day', color='primary', className='ml-2'), width='auto'),
-            ],
-            className='justify-content-center mb-4'
         ),
 
         dcc.Graph(id='daily-graph'),
@@ -151,7 +150,7 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
         rows=2, cols=1,
         shared_xaxes=True,
         vertical_spacing=0.1,
-        subplot_titles=('Angle (degrees)', 'Swelling (dimensionless)')
+        subplot_titles=('Angle', 'Swelling (circumference of knee, measured at three locations)')
     )
 
     fig_overall = make_subplots(
@@ -164,7 +163,7 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
         x=daily_data['Datetime'],
         y=daily_data['Angle [deg]'],
         mode='markers',
-        name='Angle (degrees)',
+        name='Angle',
         marker=dict(
             symbol='circle',
             size=10,
@@ -177,7 +176,7 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
         x=daily_data['Datetime'],
         y=daily_data['Circ low [cm]'],
         mode='markers',
-        name='Circ low [cm]',
+        name='Circ low',
         marker=dict(
             symbol='square',
             size=8,
@@ -189,7 +188,7 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
         x=daily_data['Datetime'],
         y=daily_data['Circ med [cm]'],
         mode='markers',
-        name='Circ med [cm]',
+        name='Circ med',
         marker=dict(
             symbol='diamond',
             size=8,
@@ -201,7 +200,7 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
         x=daily_data['Datetime'],
         y=daily_data['Circ high [cm]'],
         mode='markers',
-        name='Circ high [cm]',
+        name='Circ high',
         marker=dict(
             symbol='triangle-up',
             size=8,
@@ -272,17 +271,20 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
         title=f'Data for {current_date}',
         xaxis1=dict(
             range=[day_start, day_end],
+            nticks=24,
         ),
         xaxis2 = dict(
             range=[day_start, day_end],
+            nticks=24,
+            tickformat='%H'
         ),
         yaxis=dict(
-            title='Angle (degrees)',
+            title='Angle [deg]',
             range=[0, 150],
             nticks = 8
     ),
         yaxis2=dict(
-            title='Swelling (dimensionless)',
+            title='Swelling [cm]',
             range=[35, 45],
         ),
         height=400,
@@ -293,11 +295,11 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
     fig_overall.update_layout(
         title=f'Overall',
         yaxis=dict(
-            title='Angle (degrees)',
+            title='Angle [deg]',
             range=[0, 150],
             nticks=8
         ),
-        height=230,
+        height=250,
         legend=dict(x=0.01, y=0.99),
         margin=dict(l=0, r=0, t=40, b=20)
     )
