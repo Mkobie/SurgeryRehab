@@ -263,7 +263,14 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
         y=df['Angle [deg]'],
         mode='markers',
         name='All Angle Data',
-        line=dict(color='blue'),
+        marker=dict(symbol='circle', size=6, color='skyblue', line=dict(color='#0d6efd', width=1))
+    ), row=1, col=1)
+
+    fig_overall.add_trace(go.Scatter(
+        x=daily_data['Datetime'],
+        y=daily_data['Angle [deg]'],
+        mode='markers',
+        name='Today\'s Angle Data',
         marker=dict(symbol='circle', size=6, color='blue', line=dict(color='darkblue', width=1))
     ), row=1, col=1)
 
@@ -274,6 +281,7 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
             nticks=24,
         ),
         xaxis2 = dict(
+            title='Time of day',
             range=[day_start, day_end],
             nticks=24,
             tickformat='%H'
@@ -301,7 +309,8 @@ def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_dat
         ),
         height=250,
         legend=dict(x=0.01, y=0.99),
-        margin=dict(l=0, r=0, t=40, b=20)
+        margin=dict(l=0, r=0, t=40, b=20),
+        showlegend=False
     )
 
     fig_overall.add_hline(y=90, line_width=1, line_color="grey")
