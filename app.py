@@ -36,29 +36,44 @@ app.layout = dbc.Container(
         dcc.Store(id='default-url', data=default_gdrive_url),
 
         html.Div(
-            html.P([
-                "Data comes from " ,
-                html.A("this Google doc", href=default_gdrive_url, target="_blank"),
-                ". To use this tool yourself, make your own Google Sheet using the same format. "
-                "Upload your file on the right."
-            ]),
-            style={'position': 'absolute', 'top': '0px', 'left': '15px', 'width': '35%'},
-        ),
-
-        html.Div(
-            dbc.InputGroup(
+            [
+                dbc.InputGroup(
                 [
-                    dbc.Input(id="google-sheet-url", placeholder="Enter Google Sheet URL (allow view access)"),
-                    dbc.Button("Upload data", id="upload-button", n_clicks=0),
+                    dbc.Input(id="google-sheet-url", placeholder="Enter Google Sheet URL (allow view access)", value=default_gdrive_url),
+                    dbc.Button("Fetch data", id="upload-button", n_clicks=0),
+                    dbc.Button("?", id="upload-help-button", n_clicks=0),
                 ]
-            ), style={'position': 'absolute', 'top': '0px', 'right': '15px', 'width': '35%'},
+            ),
+            dbc.Modal(
+                [
+                    dbc.ModalHeader(dbc.ModalTitle("Upload help")),
+                    dbc.ModalBody([
+                        html.Div("Data comes from the Google Sheet at the default populated URL."),
+                        html.Br(),
+                        html.Div("To use this tool yourself, make your own copy of the default Google Sheet (must be .xlsx) and fill in your own data."),
+                        html.Br(),
+                        html.Div("Make your file viewable for anyone with the link, and replace the default link with your own link."),
+                    ]),
+                    dbc.ModalFooter(
+                        dbc.Button(
+                            "Close", id="upload-help-close", className="ms-auto", n_clicks=0
+                        )
+                    ),
+                ],
+                id="upload-help-modal",
+                is_open=False,
+            ),
+
+            ], style={'position': 'absolute', 'top': '0px', 'right': '15px', 'width': '25%'},
         ),
 
         dbc.Row(
             [
+                dbc.Col(dbc.Button('<<', id='first-day', color='primary', className='mr-2'), width='auto'),
                 dbc.Col(dbc.Button('<', id='prev-day', color='primary', className='mr-2'), width='auto'),
                 dbc.Col(html.H3(id='current-date', className='text-center'), width='auto'),
                 dbc.Col(dbc.Button('>', id='next-day', color='primary', className='ml-2'), width='auto'),
+                dbc.Col(dbc.Button('>>', id='last-day', color='primary', className='ml-2'), width='auto'),
             ],
             className='justify-content-center mb-4'
         ),
@@ -104,13 +119,15 @@ def load_data(n_clicks, default_gdrive_url, user_provided_url):
     [
         Input('prev-day', 'n_clicks'),
         Input('next-day', 'n_clicks'),
+        Input('first-day', 'n_clicks'),
+        Input('last-day', 'n_clicks'),
         Input('store-data', 'data')
     ],
     [
         State('store-date', 'data')
     ]
 )
-def update_graph(prev_clicks, next_clicks, stored_data, current_date_index):
+def update_graph(prev_clicks, next_clicks, first_clicks, last_clicks, stored_data, current_date_index):
     df = pd.DataFrame(stored_data)
     available_dates = df['Date'].unique()
 
@@ -119,6 +136,10 @@ def update_graph(prev_clicks, next_clicks, stored_data, current_date_index):
         current_date_index -= 1
     elif ctx.triggered[0]['prop_id'] == 'next-day.n_clicks' and current_date_index < len(available_dates) - 1:
         current_date_index += 1
+    elif ctx.triggered[0]['prop_id'] == 'first-day.n_clicks' and current_date_index > 0:
+        current_date_index = 0
+    elif ctx.triggered[0]['prop_id'] == 'last-day.n_clicks' and current_date_index < len(available_dates) - 1:
+        current_date_index = len(available_dates)-1
 
     current_date = available_dates[current_date_index]
     daily_data = df[df['Date'] == current_date]
@@ -284,6 +305,19 @@ def update_graph(prev_clicks, next_clicks, stored_data, current_date_index):
     fig_overall.add_hline(y=90, line_width=1, line_color="grey")
 
     return current_date_index, str(current_date), fig_daily, fig_overall
+
+@app.callback(
+    Output("upload-help-modal", "is_open"),
+    [
+        Input("upload-help-button", "n_clicks"),
+        Input("upload-help-close", "n_clicks")
+    ],
+    State("upload-help-modal", "is_open"),
+)
+def toggle_upload_help_modal(n1, n2, is_open):
+    if n1 or n2:
+        return not is_open
+    return is_open
 
 if __name__ == '__main__':
     app.run_server(debug=True)
