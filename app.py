@@ -19,13 +19,19 @@ def download_excel_from_gdrive(gdrive_url):
     output_file = 'data_from_gdrive.xlsx'
     gdown.download(download_url, output_file, quiet=False)
 
-    df = pd.read_excel(output_file)
-    df['Datetime'] = pd.to_datetime(df['Datetime'], format='%d/%m/%Y %H:%M')
+    excel_data = pd.ExcelFile(output_file)
+    df = pd.concat([excel_data.parse(sheet_name) for sheet_name in excel_data.sheet_names], ignore_index=True)
+    df['Datetime'] = pd.to_datetime(df['Datetime'], format='%d/%m/%Y %H:%M', errors='coerce')
+
+    has_invalid_entries = df['Datetime'].isna().any()
+    if has_invalid_entries:
+        df = df.dropna(subset=['Datetime'])
+
     df['Date'] = df['Datetime'].dt.date
-    return df
+    return df, has_invalid_entries
 
 default_gdrive_url = 'https://docs.google.com/spreadsheets/d/1bUDv4iCsTPddnd0yYFgj6xg_mzgpvdta/edit?usp=sharing&ouid=111732102481483761509&rtpof=true&sd=true'
-data = download_excel_from_gdrive(default_gdrive_url)
+data, has_invalid_entries = download_excel_from_gdrive(default_gdrive_url)
 available_dates = data['Date'].unique()
 
 app.layout = dbc.Container(
@@ -34,6 +40,7 @@ app.layout = dbc.Container(
         dcc.Store(id='store-dates', data=available_dates),
         dcc.Store(id='store-data', data=data.to_dict()),
         dcc.Store(id='default-url', data=default_gdrive_url),
+        dcc.Store(id='invalid_data_entries'),
 
         dbc.Row(
             [
@@ -74,6 +81,19 @@ app.layout = dbc.Container(
                 id="upload-help-modal",
                 is_open=False,
             ),
+            dbc.Modal(
+                [
+                    dbc.ModalHeader(dbc.ModalTitle("Warning: wrong formatting in Excel")),
+                    dbc.ModalBody(html.Div(id="wrong-input-format-content")),
+                    dbc.ModalFooter(
+                        dbc.Button(
+                            "Close", id="wrong-input-format-close", className="ms-auto", n_clicks=0
+                        )
+                    ),
+                ],
+                id="wrong-input-format-modal",
+                is_open=False,
+            ),
             ], style={'position': 'absolute', 'top': '0px', 'right': '15px', 'width': '25%'},
         ),
 
@@ -84,9 +104,31 @@ app.layout = dbc.Container(
 )
 
 @app.callback(
+[
+    Output('wrong-input-format-modal', 'is_open'),
+    Output('wrong-input-format-content', 'children'),
+],
+[
+    Input('invalid_data_entries', 'data'),
+    Input('wrong-input-format-close', 'n_clicks'),
+],
+[
+    State('wrong-input-format-modal', 'is_open'),
+])
+def toggle_wrong_input_warning(has_invalid_entries, n_clicks, is_open):
+    content = html.Div([html.P("Warning: Some entries have an invalid date-time format. Expected '%d/%m/%Y %H:%M', but received something different."),
+                        html.Br(),
+                        html.P("All invalid data points have been left out of the graphs shown.")])
+    if has_invalid_entries or n_clicks:
+        return not is_open, content
+    return dash.no_update
+
+
+@app.callback(
     [
         Output('store-data', 'data'),
-        Output('store-dates', 'data')
+        Output('store-dates', 'data'),
+        Output('invalid_data_entries', 'data'),
     ],
     [
         Input('upload-button', 'n_clicks')
@@ -99,11 +141,11 @@ app.layout = dbc.Container(
 def load_data(n_clicks, default_gdrive_url, user_provided_url):
     gdrive_url = user_provided_url if user_provided_url else default_gdrive_url
 
-    data = download_excel_from_gdrive(gdrive_url)
+    data, invalid_entries = download_excel_from_gdrive(gdrive_url)
     available_dates = data['Date'].unique()
 
     if data is not None:
-        return data.to_dict(), available_dates
+        return data.to_dict(), available_dates, invalid_entries
 
     return dash.no_update
 
